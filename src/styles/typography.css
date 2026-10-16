@@ -1,0 +1,2 @@
+/* System font stacks keep every resource local and work offline after loading. */
+html { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
