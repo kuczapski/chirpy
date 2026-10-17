@@ -8,6 +8,7 @@ import { Modal } from './ui/Modal';
 import { CalibrationWizard } from './ui/CalibrationWizard';
 import { showSettings } from './ui/SettingsPanel';
 import { updateDebug } from './ui/DebugOverlay';
+import { MODE_LABELS, showFlightSetup } from './ui/FlightSetup';
 
 const icons = {
   play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 11 7-11 7Z" fill="currentColor"/></svg>',
@@ -48,6 +49,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <div id="play-guidance" class="play-guidance" hidden><span>↓ low &nbsp; · &nbsp; high ↑</span><span>quiet ← &nbsp; ♪ &nbsp; → louder</span></div>
       <div id="capture-hud" class="capture-hud" hidden><span id="capture-caption">Find a cherry and hold your voice</span><progress id="capture-progress" max="1" value="0" aria-label="Cherry capture progress"></progress></div>
       <div id="meters" class="meters" hidden><span id="pitch-meter">— Hz</span><span id="db-meter">— dBFS</span></div>
+      <div id="mode-badge" class="mode-badge" hidden></div>
       <pre id="debug" class="debug" hidden></pre>
       <span id="encouragement" class="encouragement" aria-live="polite"></span>
     </section>
@@ -127,6 +129,11 @@ function showGameUI(active: boolean): void {
   $('#menu').hidden = active;
   for (const id of ['hud', 'play-guidance', 'capture-hud']) $(`#${id}`).hidden = !active;
   $('#simulation-banner').hidden = !active || !scene.simulation;
+  $('#mode-badge').hidden = !active;
+  $('#mode-badge').textContent = MODE_LABELS[settings.controlMode];
+  $('#play-guidance').innerHTML = settings.controlMode === 'pitch' ? '<span>↓ low &nbsp; · &nbsp; high ↑</span><span>Chirpy lines up left & right</span>'
+    : settings.controlMode === 'loudness' ? '<span>Chirpy lines up at cherry height</span><span>quiet ← &nbsp; ♪ &nbsp; → fuller</span>'
+    : '<span>↓ low &nbsp; · &nbsp; high ↑</span><span>quiet ← &nbsp; ♪ &nbsp; → fuller</span>';
   document.body.classList.toggle('playing', active);
   applyDisplay();
   requestAnimationFrame(() => game.scale.refresh());
@@ -148,13 +155,14 @@ function showError(message: string, retry: () => void): void {
   modal.query('#error-sim').onclick = startSimulation;
   modal.query('#error-close').onclick = returnToMenu;
 }
-async function startVoice(setupOnly = false, resume = false): Promise<void> {
+async function startVoice(setupOnly = false, resume = false, afterSetup?: () => void): Promise<void> {
   if (!ready || busy) return;
   busy = true;
   const token = ++operation;
   void sound.unlock();
-  modal.show(`<div class="loading-bird"><img src="${import.meta.env.BASE_URL}assets/bird.svg" alt="Chirpy" /></div><h2>Let’s hear your voice.</h2><p class="modal-copy">Choose Allow in your browser’s microphone prompt.<br>Your voice stays on this device.</p><button id="cancel-access" class="button secondary">Cancel</button>`, cancelPending);
-  modal.query('#cancel-access').onclick = cancelPending;
+  const cancelAccess = () => { cancelPending(); afterSetup?.(); };
+  modal.show(`<div class="loading-bird"><img src="${import.meta.env.BASE_URL}assets/bird.svg" alt="Chirpy" /></div><h2>Let’s hear your voice.</h2><p class="modal-copy">Choose Allow in your browser’s microphone prompt.<br>Your voice stays on this device.</p><button id="cancel-access" class="button secondary">Cancel</button>`, cancelAccess);
+  modal.query('#cancel-access').onclick = cancelAccess;
   try {
     await audio.start(settings);
     if (token !== operation) return;
@@ -163,7 +171,7 @@ async function startVoice(setupOnly = false, resume = false): Promise<void> {
       const result = await wizard.run();
       wizard = null;
       if (token !== operation) return;
-      if (!result) { audio.stop(); busy = false; if (scene.mode === 'pause') showPause(); return; }
+      if (!result) { audio.stop(); busy = false; if (afterSetup) afterSetup(); else if (scene.mode === 'pause') showPause(); return; }
       persist(result.settings);
       if (result.personalized) {
         acceptedDefaultsFor = null;
@@ -178,7 +186,7 @@ async function startVoice(setupOnly = false, resume = false): Promise<void> {
     if (setupOnly) {
       audio.stop();
       toast('Microphone setup complete. You’re ready to fly.');
-      if (scene.mode === 'pause') showPause();
+      if (afterSetup) afterSetup(); else if (scene.mode === 'pause') showPause();
     } else {
       if (resume) scene.resume(); else scene.start(false);
       showGameUI(true);
@@ -186,7 +194,7 @@ async function startVoice(setupOnly = false, resume = false): Promise<void> {
   } catch (error) {
     if (token !== operation) return;
     busy = false;
-    showError(error instanceof Error ? error.message : 'Could not connect to the microphone.', () => void startVoice(setupOnly, resume));
+    showError(error instanceof Error ? error.message : 'Could not connect to the microphone.', () => void startVoice(setupOnly, resume, afterSetup));
   }
 }
 function startSimulation(): void {
@@ -198,8 +206,8 @@ function showPause(message = 'Rest your voice. The meadow will wait.'): void {
   modal.show(`<div class="modal-top"><span class="eyebrow">A LITTLE BREATHER</span><span class="pause-cherry">✦</span></div><h2>You’re doing lovely.</h2><p class="modal-copy" id="pause-copy"></p><div class="pause-score"><strong>${scene.score}</strong> cherries collected</div><div class="pause-actions"><button id="resume" class="button primary">${icons.play}Keep flying</button><button id="restart" class="button secondary">Start a new flight</button><button id="pause-settings" class="button secondary">${icons.settings}Settings</button><button id="stop" class="text-button">Stop & return to menu</button></div>`, () => void resumeGame());
   modal.query('#pause-copy').textContent = message;
   modal.query('#resume').onclick = () => void resumeGame();
-  modal.query('#restart').onclick = () => scene.simulation ? startSimulation() : void startVoice();
-  modal.query('#pause-settings').onclick = openSettings;
+  modal.query('#restart').onclick = () => openFlight(scene.simulation);
+  modal.query('#pause-settings').onclick = () => openSettings();
   modal.query('#stop').onclick = returnToMenu;
 }
 function pauseGame(message?: string): void {
@@ -207,10 +215,10 @@ function pauseGame(message?: string): void {
   scene.pause(); audio.stop(); showPause(message);
 }
 async function resumeGame(): Promise<void> {
-  if (scene.simulation) { modal.close(); scene.resume(); return; }
+  if (scene.simulation) { modal.close(); scene.resume(); showGameUI(true); return; }
   await startVoice(false, true);
 }
-function openSettings(): void {
+function openSettings(onClose?: () => void): void {
   if (busy) return;
   if (scene.mode === 'play') { scene.pause(); audio.stop(); }
   void showSettings(modal, settings, audio, updated => {
@@ -218,14 +226,28 @@ function openSettings(): void {
     acceptedDefaultsFor = null;
     if (!saveCalibration(updated, 'manual')) toast('Your manual voice settings are ready for this visit, but browser storage is unavailable.');
   },
-    () => { modal.close(); if (scene.mode === 'pause') showPause(); },
-    () => void startVoice(true));
+    () => { modal.close(); if (onClose) onClose(); else if (scene.mode === 'pause') showPause(); },
+    () => void startVoice(true, false, onClose));
 }
 
-$('#play-button').onclick = () => void startVoice();
+function openFlight(simulation = false): void {
+  if (!ready || busy) return;
+  showFlightSetup(modal, settings, simulation, {
+    start: updated => {
+      persist(updated);
+      if (!saveCalibration(updated, 'manual')) toast('Your selections are ready for this visit; browser storage is unavailable.');
+      if (simulation) startSimulation(); else void startVoice();
+    },
+    manual: updated => { persist(updated); openSettings(() => openFlight(simulation)); },
+    wizard: updated => { persist(updated); void startVoice(true, false, () => openFlight(simulation)); },
+    cancel: () => { modal.close(); if (scene.mode === 'pause') showPause(); },
+  });
+}
+
+$('#play-button').onclick = () => openFlight();
 $('#setup-button').onclick = () => void startVoice(true);
-$('#simulation-button').onclick = startSimulation;
-$('#settings-button').onclick = openSettings;
+$('#simulation-button').onclick = () => openFlight(true);
+$('#settings-button').onclick = () => openSettings();
 $('#pause-button').onclick = () => pauseGame();
 $('.brand').onclick = event => { event.preventDefault(); returnToMenu(); };
 $('#sound-button').onclick = () => {

@@ -36,6 +36,7 @@ try {
   assert.equal(await page.evaluate(() => window.__micRequests), 0, 'No permission request before an explicit action');
   await page.screenshot({ path: 'artifacts/menu-desktop.png', fullPage: true });
   await page.locator('#simulation-button').click();
+  await page.locator('#flight-start').click();
   await page.locator('#simulation-banner').waitFor({ state: 'visible' });
   const canvas = await page.locator('canvas').boundingBox();
   await page.mouse.move(canvas.x + canvas.width * 436 / 1280, canvas.y + canvas.height * 409.25 / 720);
@@ -46,11 +47,37 @@ try {
   await page.locator('#resume').click();
   await page.locator('#pause-button').click();
   await page.locator('#restart').click();
+  await page.locator('#flight-start').click();
   await page.waitForFunction(() => document.querySelector('#score').textContent === '0');
   await page.locator('#pause-button').click();
   await page.locator('#stop').click();
   assert.equal(await page.evaluate(() => window.__micRequests), 0, 'Simulation never requests the microphone');
+  for (const mode of ['pitch', 'loudness']) {
+    await page.locator('#simulation-button').click();
+    await page.locator(`[name="controlMode"][value="${mode}"]`).check();
+    await page.locator('[name="pitchProfile"][value="kid"]').check();
+    await page.locator('[name="loudnessProfile"][value="quiet"]').check();
+    if (mode === 'pitch') {
+      await page.locator('#flight-manual').click();
+      assert.equal(await page.locator('[name="pitchMin"]').inputValue(), '180');
+      assert.equal(await page.locator('[name="minDb"]').inputValue(), '-55');
+      await page.getByRole('button', { name: 'Save settings', exact: true }).click();
+      assert.equal(await page.locator('[name="controlMode"][value="pitch"]').isChecked(), true);
+    }
+    await page.screenshot({ path: `artifacts/flight-${mode}.png`, fullPage: true });
+    await page.locator('#flight-start').click();
+    // Deliberately put the unused mouse axis far from the cherry.
+    for (const [index, [x, y]] of [[436, 409.25], [568.6, 333.6]].entries()) {
+      await page.mouse.move(canvas.x + canvas.width * (mode === 'pitch' ? 1100 : x) / 1280,
+        canvas.y + canvas.height * (mode === 'loudness' ? 130 : y) / 720);
+      await page.waitForFunction(score => document.querySelector('#score').textContent === String(score), index + 1);
+    }
+    assert.equal(await page.locator('#mode-badge').innerText(), mode === 'pitch' ? 'Pitch' : 'Loudness');
+    await page.locator('#pause-button').click();
+    await page.locator('#stop').click();
+  }
   await page.locator('#settings-button').click();
+  await page.locator('[name="controlMode"]').selectOption('full');
   await page.locator('[name="debug"]').check();
   await page.locator('[name="showMeters"]').check();
   await page.locator('[name="pitchMax"]').fill('140');
@@ -65,6 +92,7 @@ try {
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('chirpy-settings-v1')).debug), true);
   // Saving manual ranges is a valid setup choice, including after reload.
   await page.locator('#play-button').click();
+  await page.locator('#flight-start').click();
   await page.locator('#hud').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#cal-record').count(), 0);
   assert.deepEqual(await page.evaluate(() => {
@@ -82,7 +110,8 @@ try {
   await page.locator('#pause-button').click();
   await page.locator('#stop').click();
   // Explicit setup remains available and is allowed to replace manual ranges.
-  await page.locator('#setup-button').click();
+  await page.locator('#play-button').click();
+  await page.locator('#flight-wizard').click();
   await page.locator('#cal-record').waitFor();
   const tones = [[250, 0.0001], [250, 0.12], [180, 0.12], [400, 0.12], [250, 0.035], [250, 0.2]];
   for (let index = 0; index < tones.length; index++) {
@@ -103,7 +132,10 @@ try {
   }
   await page.waitForFunction(() => localStorage.getItem('chirpy-calibration-v1') !== null);
   assert.equal(await page.evaluate(() => window.__micStreams.every(s => s.getTracks().every(t => t.readyState === 'ended'))), true, 'Setup releases microphone tracks');
+  await page.locator('#flight-form').waitFor();
+  await page.locator('#flight-back').click();
   await page.locator('#play-button').click();
+  await page.locator('#flight-start').click();
   await page.locator('#hud').waitFor({ state: 'visible' });
   await page.evaluate(() => window.__testTone(250, 0.12));
   await page.waitForFunction(() => document.querySelector('#mic-status').textContent.includes('we hear'));
@@ -127,6 +159,9 @@ try {
   await page.screenshot({ path: 'artifacts/menu-mobile.png', fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Mobile page has no horizontal overflow');
   await page.locator('#simulation-button').click();
+  await page.screenshot({ path: 'artifacts/flight-mobile.png', fullPage: true });
+  assert.equal(await page.locator('dialog').evaluate(el => el.scrollWidth <= el.clientWidth), true, 'Mobile flight selector fits its dialog');
+  await page.locator('#flight-start').click();
   const mobileCanvas = await page.locator('canvas').boundingBox();
   await page.mouse.click(mobileCanvas.x + mobileCanvas.width * 436 / 1280, mobileCanvas.y + mobileCanvas.height * 409.25 / 720);
   await page.waitForFunction(() => document.querySelector('#score').textContent === '1');
@@ -140,6 +175,7 @@ try {
   });
   await page.reload({ waitUntil: 'networkidle' });
   await page.locator('#play-button').click();
+  await page.locator('#flight-start').click();
   await page.locator('#hud').waitFor({ state: 'visible' });
   await page.evaluate(() => window.__testTone(250, 0.12));
   await page.waitForFunction(() => document.querySelector('#mic-status').textContent.includes('we hear'));
@@ -153,12 +189,13 @@ try {
   });
   await page.reload({ waitUntil: 'networkidle' });
   await page.locator('#play-button').click();
+  await page.locator('#flight-start').click();
   await page.locator('#mic-error').waitFor();
   assert.match(await page.locator('#mic-error').innerText(), /browser’s site settings/);
   await page.locator('#error-sim').click();
   assert.equal(await page.locator('#simulation-banner').isVisible(), true);
   assert.deepEqual(errors, [], 'No browser runtime errors');
-  console.log('PASS: desktop/mobile simulation, collection, pause/resume/restart, settings validation/persistence, six-step calibration, real AudioWorklet + worker with synthetic MediaStream, mapping direction, silence rejection, microphone cleanup, ScriptProcessor fallback, permission-denied recovery, no runtime errors.');
+  console.log('PASS: full/pitch/loudness modes, preset selection, manual/wizard return paths, mobile flight selector, desktop/mobile simulation, collection, pause/resume/restart, settings persistence, calibration, real audio worklet/worker, fallback, permission recovery, no runtime errors.');
 } catch (error) {
   await page.screenshot({ path: 'artifacts/browser-failure.png', fullPage: true });
   console.error('Browser errors:', errors);

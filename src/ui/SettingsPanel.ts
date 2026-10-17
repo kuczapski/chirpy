@@ -18,6 +18,7 @@ export async function showSettings(modal: Modal, settings: Settings, input: Audi
     <p class="hint">Saving uses your voice settings directly. Choose Microphone Setup only when you want to measure your ranges again.</p>
     <form id="settings-form">
       <fieldset><legend>Voice & movement</legend><div class="form-grid">
+        <label class="wide">Flight controls<select name="controlMode"><option value="pitch">Pitch · height only</option><option value="loudness">Loudness · left and right only</option><option value="full">Full Control · both axes</option></select></label>
         ${field('pitchMin', 'Low pitch · Hz')}${field('pitchMax', 'High pitch · Hz')}
         ${field('minDb', 'Quiet voice · dBFS')}${field('maxDb', 'Loud voice · dBFS')}
         <label>Pitch mapping<select name="mapping"><option value="logarithmic">Musical / logarithmic</option><option value="linear">Linear in Hz</option></select></label>
@@ -46,6 +47,7 @@ export async function showSettings(modal: Modal, settings: Settings, input: Audi
   const form = modal.query<HTMLFormElement>('#settings-form');
   const control = <T extends HTMLInputElement | HTMLSelectElement>(key: keyof Settings): T => form.elements.namedItem(key) as T;
   control('mapping').value = settings.mapping;
+  control('controlMode').value = settings.controlMode;
   control('difficulty').value = settings.difficulty;
   control('windowMs').value = String(settings.windowMs);
   modal.query('#settings-close').onclick = close;
@@ -74,6 +76,7 @@ export async function showSettings(modal: Modal, settings: Settings, input: Audi
     const updated = { ...settings };
     for (const key of Object.keys(NUMBER_LIMITS) as NumericKey[]) updated[key] = Number(control(key).value);
     updated.mapping = control('mapping').value as Settings['mapping'];
+    updated.controlMode = control('controlMode').value as Settings['controlMode'];
     updated.difficulty = control('difficulty').value as Settings['difficulty'];
     updated.deviceId = control('deviceId').value;
     for (const key of ['debug', 'showMeters', 'reducedMotion'] as const) updated[key] = control<HTMLInputElement>(key).checked;

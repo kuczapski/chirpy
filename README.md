@@ -27,13 +27,27 @@ That bootstrap folder is tooling only; it is not needed with a normal Node/npm i
 
 ## Play
 
-1. Select **Let’s play** and allow microphone access when the browser asks.
-2. If you have not calibrated this input, follow the short microphone setup.
+1. Select **Let’s play** to choose your control mode and voice ranges. This screen does not open the microphone.
+2. Use your current settings or a preset, open **Manual configuration**, or choose the **Microphone Setup** wizard. Select **Start flying** and allow microphone access when the browser asks.
 3. Sustain a comfortable “AAAA”. Raise/lower its pitch to fly up/down. Make it softer/fuller to move left/right. There is no need to shout.
 4. Stay near a cherry until its white ring fills. A visual burst, an optional chime, and the score show success.
 5. Select **Pause**, or press Escape, to rest, resume, restart, change settings, or stop. Switching tabs also pauses the flight.
 
-The microphone is requested only through Play or Microphone Setup (including its explicit retry button). Pause, Stop, canceled setup, completed standalone setup, a disconnected device, and leaving the page release microphone tracks and audio resources. Resume reconnects from a user gesture.
+The microphone is requested only through Start flying or Microphone Setup (including its explicit retry button). Pause, Stop, canceled setup, completed standalone setup, a disconnected device, and leaving the page release microphone tracks and audio resources. Resume reconnects from a user gesture.
+
+### Flight modes and voice profiles
+
+The pre-flight screen appears for both voice play and simulation, and when starting a new flight from Pause:
+
+- **Pitch**: Chirpy automatically lines up below each cherry. Pitch controls height; loudness does not change the horizontal position.
+- **Loudness**: Chirpy automatically lines up at the cherry’s height. Loudness controls horizontal position; pitch does not change height.
+- **Full Control**: pitch controls height and loudness controls horizontal position, as in the original game.
+
+All modes still require a valid voiced signal to collect a cherry. Silence returns only the trained axis toward its resting position while the automatic axis stays aligned. Automatic alignment updates for every new cherry. The current mode is shown during play and can also be changed in Settings.
+
+Pitch presets are **Kid (180–600 Hz)**, **Adult (100–380 Hz)**, **High-pitched (220–700 Hz)**, and **Low-pitched (70–250 Hz)**. They are optional starting ranges, not measured or required ranges for any person. Independently select **Quiet (−55 to −30 dBFS)**, **Comfortable (−42 to −18 dBFS)**, or **Fuller voice (−32 to −10 dBFS)**. Quiet still means voiced sound, not silence. Input level bounds can be edited on this screen; a separate slider controls the success chime. The gate and detection range are kept compatible with the selected ranges.
+
+**Current settings** preserves your existing manual or measured ranges. Starting a flight accepts the displayed ranges without forcing calibration. Manual configuration and the wizard return to the pre-flight screen, keeping the selected mode. Presets and mode affect simulation too. Preset definitions live in `src/config/VoiceProfiles.ts`.
 
 ### Simulation Mode
 
@@ -124,7 +138,7 @@ Reduced motion respects the system preference initially and can be overridden. I
 
 ## Tests
 
-`npm test` runs 41 hardware-independent Vitest tests for:
+`npm test` runs 59 hardware-independent Vitest tests for:
 
 - 80–790 Hz tones, including the requested 200 and 400 Hz cases.
 - A stronger second harmonic, silence, noise, and octave-error rejection.
@@ -134,6 +148,7 @@ Reduced motion respects the system preference initially and can be overridden. I
 - Delayed starts, breathing pauses, octave outliers, slower analysis cadence, and room-noise transients during calibration.
 - A harmonic vowel with vibrato and breath noise, loudness-ripple suppression, sustained horizontal changes, endpoint reachability, and position holding during chimes.
 - Acceptance and persistence of manual voice setup, reset behavior, existing measured profiles, invalid ranges, and blocked storage.
+- Single-axis alignment across targets, unchanged full control, silence gating, and all pitch/loudness preset combinations.
 
 An optional real-browser smoke test is included in `scripts/browser-smoke.mjs`. It feeds a synthetic Web Audio MediaStream through the **actual** worklet and worker; it does not substitute fake analysis values. It tests the UI, simulation collection, persistence, calibration, axis directions, silence, cleanup, compatibility capture, and denied-permission recovery. No microphone hardware is opened by that test.
 

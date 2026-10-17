@@ -9,7 +9,7 @@ Initial release verified on 16 October 2026; manual-settings fix verified on 17 
 | npm install | Passed; 54 packages installed, lockfile created |
 | npm run dev | Passed; Vite serves the app |
 | npm run typecheck | Passed; strict TypeScript |
-| npm test | Passed; 41 tests across four suites |
+| npm test | Passed; 59 tests across five suites |
 | npm run build | Passed; production output in dist/ |
 | npm run preview | Passed; static production build served locally |
 | npm run test:browser | Passed against the production build |
@@ -56,6 +56,12 @@ The mobile gameplay screenshot intentionally has debug enabled from the persiste
 After a user reported difficulty completing the comfortable-voice step and horizontal oscillation, calibration was changed to gather usable voiced duration over up to eight seconds. It now tolerates pauses and isolated pitch outliers, uses a robust room-floor estimate, and expands the setup detection range. YIN now compares a shorter recent span and uses a 0.80 periodicity floor; deterministic broadband noise is still rejected in tests.
 
 Horizontal control now filters transient levels, adds hysteresis, and smooths small corrections. A separate bug was fixed where the success-chime input guard was interpreted as silence and could pull the bird left. Regression tests cover these behaviors with imperfect synthetic voices and volume ripples.
+
+## Flight modes and presets
+
+Added Pitch, Loudness, and Full Control modes with a pre-flight selection screen for voice and simulation. Pitch mode locks X to the current target; Loudness mode locks Y. The browser regression collects two successive targets in each single-axis mode with the unused mouse axis deliberately positioned far away. Unit tests additionally verify silence remains invalid and Full Control retains both voice axes.
+
+The screen offers independent pitch and loudness presets, editable input dBFS bounds, success-chime volume, manual configuration, and the existing microphone wizard. Tests cover all twelve preset combinations and preservation of unrelated settings. Saved/current ranges remain the initial choice. No microphone is opened just by displaying the selector.
 
 ## Remaining real-world verification
 

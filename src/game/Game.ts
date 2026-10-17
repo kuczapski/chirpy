@@ -6,6 +6,7 @@ import { simulatedAnalysis } from '../controls/SimulationController';
 import { CaptureTracker } from './CaptureTracker';
 import { Bird } from './objects/Bird';
 import { Cherry } from './objects/Cherry';
+import { alignToTarget } from '../controls/ControlMode';
 
 export interface GameSnapshot {
   score: number; progress: number; analysis: Analysis; position: Position;
@@ -113,6 +114,9 @@ export class MeadowScene extends Phaser.Scene {
     }
     const position = fieldPosition(nx, ny);
     this.cherry.setPosition(position.x, position.y).setVisible(true);
+    const mode = this.callbacks.settings().controlMode;
+    if (mode === 'pitch') this.bird.x = this.cherry.x;
+    if (mode === 'loudness') this.bird.y = this.cherry.y;
   }
   private celebrate(): void {
     const reduced = this.callbacks.settings().reducedMotion;
@@ -150,7 +154,8 @@ export class MeadowScene extends Phaser.Scene {
     const analysis = this.simulation
       ? simulatedAnalysis(this.lastX, this.lastY, this.pointerActive, now, settings)
       : this.callbacks.analysis();
-    const position = this.mapper.update(analysis, now, delta, settings, !this.simulation && this.callbacks.holdVoiceInput());
+    const mapped = this.mapper.update(analysis, now, delta, settings, !this.simulation && this.callbacks.holdVoiceInput());
+    const position = alignToTarget(mapped, this.cherry, settings.controlMode);
     this.bird.setPosition(position.x, position.y);
     this.bird.animate(time, settings.reducedMotion, position.valid);
     this.shadow.setPosition(position.x, 601).setScale(0.45 + position.y / 1400).setAlpha(0.55);

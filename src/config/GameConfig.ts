@@ -1,7 +1,9 @@
 export type Difficulty = 'easy' | 'normal' | 'advanced';
 export type PitchMapping = 'logarithmic' | 'linear';
+export type ControlMode = 'pitch' | 'loudness' | 'full';
 
 export interface Settings {
+  controlMode: ControlMode;
   pitchMin: number;
   pitchMax: number;
   minDb: number;
@@ -35,6 +37,7 @@ export const DIFFICULTIES = {
 } as const;
 
 export const DEFAULTS: Settings = {
+  controlMode: 'full',
   pitchMin: 140, pitchMax: 440, minDb: -42, maxDb: -18,
   mapping: 'logarithmic', pitchSmoothing: 90, loudnessSmoothing: 110,
   silenceTimeout: 200, deadband: 0.012, captureRadius: 58, captureHold: 400,
@@ -52,6 +55,8 @@ export const NUMBER_LIMITS: Partial<Record<keyof Settings, [number, number]>> = 
 };
 
 export function validateSettings(s: Settings): string | null {
+  // Older saved calibration records did not include a control mode.
+  if (!['pitch', 'loudness', 'full'].includes(s.controlMode ?? 'full')) return 'Choose a valid control mode.';
   for (const [key, range] of Object.entries(NUMBER_LIMITS)) {
     const value = s[key as keyof Settings];
     if (typeof value !== 'number' || !Number.isFinite(value) || value < range[0] || value > range[1]) {
