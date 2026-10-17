@@ -68,3 +68,7 @@ The screen offers independent pitch and loudness presets, editable input dBFS bo
 **A physical microphone and a human voice were not tested.** The automated browser uses synthetic audio and cannot establish real-room pitch reliability, comfortable personal ranges, microphone gain behavior, or native permission-prompt behavior on a particular device.
 
 Firefox, Safari/iPadOS, touch hardware, and actual device switching remain manual compatibility checks. The game includes the necessary input selection and cleanup paths, but hardware differences can affect latency and detection. See the README for known audio limitations and setup guidance.
+
+Fullscreen play: use the expand button beside Pause. Browsers without native fullscreen use a viewport-filling layout with the same exit button. Pitch mode on portrait phones uses a tall canvas and centers targets; rotation restores the wide meadow without resetting the score. Pause and Settings remain available in fullscreen.
+
+Fullscreen regression: `node scripts/fullscreen-smoke.mjs` (optional Playwright, with `PLAYWRIGHT_MODULE` and `BASE_URL` overrides) covers portrait cherry capture, native fullscreen, pause/resume, unsupported-API fallback, rotation, and menu cleanup. Physical iPhone testing remains recommended.

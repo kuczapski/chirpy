@@ -30,6 +30,20 @@ export class MeadowScene extends Phaser.Scene {
   private mapper = new VoiceMapper();
   private capture = new CaptureTracker();
   private nextHud = 0;
+  private portrait = false;
+  private targetX = 1060;
+  setPortrait(width: number | null): void {
+    this.portrait = width !== null;
+    const logicalWidth = width ?? 1280;
+    this.scale.setGameSize(logicalWidth, 720);
+    this.cameras.main.setScroll((1280 - logicalWidth) / 2, 0);
+    if (this.cherry && this.mode !== 'menu') {
+      this.cherry.x = this.portrait ? 640 : this.targetX;
+      if (this.callbacks.settings().controlMode === 'pitch') this.bird.x = this.cherry.x;
+    }
+    this.capture.reset();
+    this.pointerActive = false;
+  }
   private pointerActive = false;
   private lastX = FIELD.left as number;
   private lastY = FIELD.bottom as number;
@@ -113,7 +127,8 @@ export class MeadowScene extends Phaser.Scene {
       ny = 0.5 + (Math.random() - 0.5) * spread * 0.85;
     }
     const position = fieldPosition(nx, ny);
-    this.cherry.setPosition(position.x, position.y).setVisible(true);
+    this.targetX = position.x;
+    this.cherry.setPosition(this.portrait ? 640 : position.x, position.y).setVisible(true);
     const mode = this.callbacks.settings().controlMode;
     if (mode === 'pitch') this.bird.x = this.cherry.x;
     if (mode === 'loudness') this.bird.y = this.cherry.y;

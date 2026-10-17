@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const browser = await chromium.launch({channel:'chrome',headless:true});
+const page = await browser.newPage({viewport:{width:390,height:844}});
+const errors=[]; page.on('pageerror', e=>errors.push(e.message));
+try {
+await page.goto(process.env.BASE_URL || 'http://127.0.0.1:5175/');
+await page.locator('#simulation-button').click();
+await page.locator('[name="controlMode"][value="pitch"]').check();
+await page.locator('#flight-start').click();
+await page.waitForTimeout(500);
+let box=await page.locator('canvas').boundingBox();
+assert(box.height>box.width*1.5);
+await page.mouse.move(box.x+box.width/2,box.y+box.height*409.25/720);
+await page.waitForFunction(()=>document.querySelector('#score').textContent==='1');
+await page.locator('#fullscreen-button').click();
+await page.waitForTimeout(500);
+assert(await page.evaluate(()=>!!document.fullscreenElement));
+await page.locator('#pause-button').click();
+assert(await page.locator('#resume').isVisible());
+await page.locator('#resume').click();
+await page.screenshot({path:'artifacts/fullscreen-pitch-phone.png'});
+await page.locator('#fullscreen-button').click();
+await page.evaluate(()=>{Element.prototype.requestFullscreen=undefined;});
+await page.locator('#fullscreen-button').click();
+assert(await page.evaluate(()=>document.body.classList.contains('game-expanded')));
+await page.setViewportSize({width:844,height:390});
+await page.waitForTimeout(500);
+box=await page.locator('canvas').boundingBox();
+assert(Math.abs(box.width/box.height-16/9)<.02);
+await page.locator('#pause-button').click();
+await page.locator('#stop').click();
+assert(!await page.evaluate(()=>document.body.classList.contains('game-expanded')));
+assert.deepEqual(errors,[]);
+console.log('Fullscreen, portrait capture, rotation, fallback and menu cleanup passed.');
+} finally {await browser.close();}

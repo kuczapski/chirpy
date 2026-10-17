@@ -43,6 +43,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <div id="hud" class="hud" hidden>
         <div class="score-badge"><img src="${import.meta.env.BASE_URL}assets/cherry.svg" alt="Cherries" /><strong id="score">0</strong><span>collected</span></div>
         <div class="mic-badge"><span id="mic-dot"></span><span id="mic-status">Listening for your voice</span></div>
+        <button id="fullscreen-button" class="button pause-button" aria-label="Enter fullscreen" aria-pressed="false" title="Enter fullscreen">&#x26F6;</button>
         <button id="pause-button" class="button pause-button" aria-label="Pause game">Ⅱ <span>Pause</span></button>
       </div>
       <div id="simulation-banner" class="simulation-banner" hidden>SIMULATION MODE <span>· Move your mouse or touch the meadow</span></div>
@@ -69,6 +70,10 @@ let settings = loadSettings();
 const audio = new AudioInput();
 const sound = new SuccessSound();
 const modal = new Modal();
+const shell = $('.game-shell');
+shell.append(modal.element);
+let expanded = false;
+let nativeFullscreen = false;
 let wizard: CalibrationWizard | null = null;
 let operation = 0;
 let busy = false;
@@ -107,6 +112,43 @@ const { game, scene } = createGame($('#game-canvas'), {
   },
 });
 
+function updateGameLayout(): void {
+  if (!ready) return;
+  const portrait = scene.mode !== 'menu' && settings.controlMode === 'pitch'
+    && window.innerWidth <= 760 && window.innerHeight > window.innerWidth;
+  shell.classList.toggle('pitch-portrait', portrait);
+  const bounds = shell.getBoundingClientRect();
+  scene.setPortrait(portrait ? 720 * bounds.width / bounds.height : null);
+  game.scale.refresh();
+}
+function setExpanded(value: boolean): void {
+  expanded = value;
+  document.body.classList.toggle('game-expanded', value);
+  const button = $('#fullscreen-button');
+  button.setAttribute('aria-pressed', String(value));
+  button.setAttribute('aria-label', value ? 'Exit fullscreen' : 'Enter fullscreen');
+  button.title = value ? 'Exit fullscreen' : 'Enter fullscreen';
+  button.textContent = value ? '↙' : '⛶';
+  requestAnimationFrame(updateGameLayout);
+}
+async function leaveFullscreen(): Promise<void> {
+  setExpanded(false);
+  if (document.fullscreenElement === shell) await document.exitFullscreen().catch(() => {});
+}
+async function toggleFullscreen(): Promise<void> {
+  if (expanded) { await leaveFullscreen(); return; }
+  setExpanded(true);
+  try {
+    if (shell.requestFullscreen) await shell.requestFullscreen();
+  } catch { /* Keep the screen-filling layout when native fullscreen is unavailable. */ }
+}
+function fullscreenChanged(): void {
+  if (document.fullscreenElement === shell) { nativeFullscreen = true; setExpanded(true); }
+  else if (nativeFullscreen) { nativeFullscreen = false; setExpanded(false); }
+}
+window.addEventListener('resize', updateGameLayout);
+document.addEventListener('fullscreenchange', fullscreenChanged);
+
 function toast(message: string): void {
   window.clearTimeout(toastTimer);
   $('#toast').textContent = message; $('#toast').hidden = false;
@@ -136,7 +178,8 @@ function showGameUI(active: boolean): void {
     : '<span>↓ low &nbsp; · &nbsp; high ↑</span><span>quiet ← &nbsp; ♪ &nbsp; → fuller</span>';
   document.body.classList.toggle('playing', active);
   applyDisplay();
-  requestAnimationFrame(() => game.scale.refresh());
+  if (!active) void leaveFullscreen();
+  requestAnimationFrame(updateGameLayout);
 }
 function cancelPending(): void {
   operation++; busy = false;
@@ -249,6 +292,7 @@ $('#setup-button').onclick = () => void startVoice(true);
 $('#simulation-button').onclick = () => openFlight(true);
 $('#settings-button').onclick = () => openSettings();
 $('#pause-button').onclick = () => pauseGame();
+$('#fullscreen-button').onclick = () => void toggleFullscreen();
 $('.brand').onclick = event => { event.preventDefault(); returnToMenu(); };
 $('#sound-button').onclick = () => {
   if (settings.volume > 0) beforeMute = settings.volume;
@@ -259,6 +303,7 @@ audio.onError = message => {
   if (busy) { cancelPending(); showError(message, () => void startVoice(true)); }
 };
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && expanded && !modal.element.open) { void leaveFullscreen(); return; }
   if (event.key === 'Escape' && !modal.element.open && scene.mode === 'play') pauseGame();
 });
 document.addEventListener('visibilitychange', () => {
@@ -268,5 +313,5 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 window.addEventListener('pagehide', () => { cancelPending(); sound.close(); });
-if (import.meta.hot) import.meta.hot.dispose(() => { cancelPending(); sound.close(); game.destroy(true); modal.element.remove(); });
+if (import.meta.hot) import.meta.hot.dispose(() => { cancelPending(); sound.close(); window.removeEventListener('resize', updateGameLayout); document.removeEventListener('fullscreenchange', fullscreenChanged); document.body.classList.remove('game-expanded'); game.destroy(true); modal.element.remove(); });
 applyDisplay();

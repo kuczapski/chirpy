@@ -221,3 +221,27 @@ summary { cursor: pointer; font-size: 13px; font-weight: 700; min-height: 24px; 
   .form-grid { grid-template-columns: 1fr; } .pause-actions { grid-template-columns: 1fr; }
   .button-row .button { flex: 1 0 auto; } .modal-copy { font-size: 13px; }
 }
+body.game-expanded { overflow: hidden; }
+.game-expanded .game-shell, .game-shell:fullscreen {
+  position: fixed; inset: 0; z-index: 100; width: 100%; height: 100dvh;
+  max-width: none; aspect-ratio: auto; border: 0; border-radius: 0; background: #b8e1e8;
+}
+.game-expanded .hud {
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
+}
+.game-expanded .capture-hud, .game-expanded .play-guidance { bottom: max(18px, env(safe-area-inset-bottom)); }
+#fullscreen-button { min-width: 44px; min-height: 44px; padding: 5px 10px; font-size: 24px; }
+@media (max-width: 760px) and (orientation: portrait) {
+  .playing .game-shell.pitch-portrait { height: max(480px, calc(100dvh - 110px)); aspect-ratio: auto; }
+  .game-expanded .game-shell.pitch-portrait { height: 100dvh; }
+  .pitch-portrait .play-guidance { bottom: 65px; flex-direction: column; gap: 6px; }
+  .pitch-portrait .capture-hud { bottom: max(22px, env(safe-area-inset-bottom)); width: 220px; }
+  .pitch-portrait .capture-hud span { font-size: 10px; }
+  .pitch-portrait .encouragement { bottom: 110px; }
+  .hud .mic-badge { min-width: 0; }
+  .hud #mic-status { max-width: 90px; }
+}
+@media (max-width: 760px) and (orientation: portrait) {
+  .pitch-portrait .play-guidance { align-items: center; font-size: 11px; text-align: center; }
+}
